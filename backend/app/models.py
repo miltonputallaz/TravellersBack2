@@ -3,6 +3,13 @@ import uuid
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
+class UserTravelLink(SQLModel, table=True):
+    user_id: uuid.UUID | None = Field(default=None, foreign_key="travel.id", primary_key=True)
+    travel_id: uuid.UUID | None = Field(default=None, foreign_key="user.id", primary_key=True)
+
+class OwnerTravelLink(SQLModel, table=True):
+    user_id: uuid.UUID | None = Field(default=None, foreign_key="user.id", primary_key=True)
+    travel_id: uuid.UUID | None = Field(default=None, foreign_key="travel.id", primary_key=True)
 
 # Shared properties
 class UserBase(SQLModel):
@@ -44,6 +51,8 @@ class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
     items: list["Item"] = Relationship(back_populates="owner", cascade_delete=True)
+    travels: list["Travel"] = Relationship(back_populates="users", link_model=UserTravelLink)
+    owned_travels: list["Travel"] = Relationship(back_populates="owners", link_model=OwnerTravelLink)
 
 
 # Properties to return via API, id is always required
@@ -55,6 +64,31 @@ class UsersPublic(SQLModel):
     data: list[UserPublic]
     count: int
 
+
+# Shared properties
+class TravelBase(SQLModel):
+    title: str = Field(nullable = False, min_length = 1, max_length=255)
+    description: str | None = Field(default=None, max_length=255)
+    imageId: str | None = Field(default=None)
+    
+class TravelBaseIdentified(TravelBase):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    
+class Travel(TravelBaseIdentified, table=True):
+    owners: list[User] = Relationship(back_populates="owned_travels", link_model=OwnerTravelLink)
+    users: list[User] = Relationship(back_populates="travels", link_model=UserTravelLink)
+
+class TravelRegister(TravelBase):
+    invited_emails: list[EmailStr] | None = Field(default= None)
+
+# Properties to return via API, id is always required
+class TravelPublic(TravelBaseIdentified):
+    owner: bool = False
+
+
+class TravelsPublic(SQLModel):
+    data: list[TravelPublic]
+    count: int
 
 # Shared properties
 class ItemBase(SQLModel):
